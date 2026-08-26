@@ -1,0 +1,18 @@
+[project]
+name = "sci-utils"
+version = "0.1.0"
+description = "General computational science utilities."
+readme = "README.md"
+authors = [
+    { name = "jonathan-chien", email = "jonathanmchien@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.11.1",
+    "numpy>=2.5.2",
+    "torch>=2.13.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.21,<0.10.0"]
+build-backend = "uv_build"

@@ -1,0 +1,1 @@
+Library of general Python utilities for use in a computational science research setting. This was originally the general_utils package of the counting-rnn repository at src/general_utils. It was extracted with git filter-repo and renamed sci-utils on 2026/08/26.
