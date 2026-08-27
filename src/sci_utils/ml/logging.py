@@ -77,21 +77,29 @@ class Logger:
                     flush=self.print_flush_epoch
                 )
 
-    def to_cpu(self):
+    def to_cpu(self, level: str):
         """ 
         All tensors should have been detached at the time they were logged.
         Here, they can be periodically moved to the CPU.
         """
+        if level == 'batch':
+            target = self.batch_logs
+        elif level == 'epoch':
+            target = self.epoch_logs
+        else:
+            raise ValueError(
+                f"Unrecognized value {level} for `level`. Must be in ('batch', 'epoch')."
+            )
         recursion.recursive(
-            self,
-            branch_conditions=(
+            target,
+            branch_conditionals=(
                 recursion.dataclass_branch,
                 recursion.dict_branch,
                 recursion.list_branch,
                 recursion.tuple_branch
             ),
             leaf_fns=(
-                tensor_.move_to_device('cpu')
+                tensor_.move_to_device('cpu'),
             )
         )
 

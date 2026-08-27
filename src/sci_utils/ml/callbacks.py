@@ -62,7 +62,7 @@ class ComputeMetrics(CallbackBase):
 
     def __call__(self, batch_env: BatchEnvironment):
         batch_env.metrics = {
-            name: metric(batch_env) for name, metric in self.metrics
+            name: metric(batch_env) for name, metric in self.metrics.items()
         }
 
         return None
@@ -120,6 +120,16 @@ class LogParams(CallbackBase):
             params = dict(self.model.named_parameters())
             params = {name: p.detach().clone() for name, p in params.items()}
             self.logger.log_epoch(epoch_idx=epoch_idx, params=params)
+
+
+@dataclass
+class MoveToCPU(CallbackBase):
+    logger: Logger
+    level: str
+
+    def __call__(self, epoch_idx):
+        if self._should_run(epoch_idx):
+            self.logger.to_cpu(level=self.level)
 
 
 @dataclass
