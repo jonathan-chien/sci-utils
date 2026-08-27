@@ -1,85 +1,19 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from pathlib import Path
-import torch
-from typing import Union
 import warnings
 
-from .. import tensor as tensor_utils
+import torch
+
 from .. import validation as validation_utils
-from .config import RequiresGradConfig
 
 
-# class EarlyStopping:
-#     """ 
-#     """
-#     def __init__(
-#         self, 
-#         metric_name: str,
-#         strategy,
-#         min_epochs_before_stopping: int = 1,
-#         verbose=True,
-#         disabled=False
-#     ):
-#         """ 
-#         verbose is not used in any internal methods. Rather since this is an
-#         auxiliary class meant to function in a training environment, that
-#         environment can access the verbose attribute to know whether or not
-#         to print to console. 
-#         """
-#         self.metric_name = metric_name
-#         self.strategy = strategy
-#         self.min_epochs_before_stopping = min_epochs_before_stopping
-#         self.verbose = verbose
-#         self.disabled = disabled
+class StopTraining(Exception):
+    pass
 
-#         self.condition_reached_at_epoch = None
-
-#     def update(self, x):
-#         """ 
-#         """
-#         self.strategy.update(x)
-
-#     def should_stop(self, epoch_idx):
-#         """ 
-#         """
-#         if self.disabled or epoch_idx + 1 < self.min_epochs_before_stopping: 
-#             return False
-#         if self.strategy.should_stop():
-#             self.condition_reached_at_epoch = epoch_idx
-#             return True
-
-#         # diffs = torch.diff(self.recent_vals, n=1)
-#         # if (
-#         #     (self.mode == 'min' and (diffs > self.tol).all())
-#         #     or (self.mode == 'max' and (diffs < -self.tol).all())
-#         # ):
-#         #     self.stopped_after_epoch = epoch_idx
-#         #     return True
-
-#         # return False
-        
-#     def print_to_console(self):
-#         if self.condition_reached_at_epoch is None:
-#             raise RuntimeError(
-#                 "Attempting to print to console that early stopping condition " 
-#                 "has been reached, but self.should_stop has not returned True yet."
-#             )
-#         self.strategy.print_to_console(self.condition_reached_at_epoch)
-
-# @dataclass(frozen=False)
-# class EarlyStoppingCommon:
-#     metric_name: str
-#     warmup: int 
-#     verbose: bool 
-#     disabled: bool 
-#     condition_reached_at_update: Union[None, int]
-#     num_updates: int
 
 class EarlyStopping(ABC):
     """ 
     """
-
     def __init__(
         self, 
         metric_name: str, 
@@ -89,14 +23,6 @@ class EarlyStopping(ABC):
     ):
         validation_utils.validate_str(metric_name)
         validation_utils.validate_nonneg_int(warmup)
-        # self.common = EarlyStoppingCommon(
-        #     metric_name=metric_name,
-        #     warmup=warmup,
-        #     verbose=verbose,
-        #     disabled=disabled,
-        #     condition_reached_at_update=None, # When stopping condition is first reached
-        #     num_updates = 0
-        # )
         self.metric_name = metric_name
         self.warmup = warmup
         self.verbose = verbose
@@ -104,11 +30,6 @@ class EarlyStopping(ABC):
 
         self.condition_reached_at_update = None
         self.num_updates = 0
-
-    # def update(self, x: float):
-        
-    #     self.num_updates += 1
-    #     self._update_rule(x)
 
     def should_stop(self, x: float) -> bool:
         """ 
@@ -261,7 +182,7 @@ class NoImprovementStopping(EarlyStopping):
         self.recent_vals.fill_(torch.nan)
     
         
-class MetricTracker:
+class CheckpointMonitor:
     """ 
     """
     def __init__(self, metric_name, checkpoint_dir, mode: str, frequency: str ='best'):
@@ -388,43 +309,4 @@ class MetricTracker:
         should_save, is_best = self.should_save(value, epoch_idx)
         if should_save:
             self.save(checkpoint, epoch_idx, is_best=is_best)
-
-
-def set_requires_grad(
-    model: torch.nn.Module, 
-    cfg: RequiresGradConfig,
-):
-    """ 
-    """
-    def set_value(named_params, networks, value):
-        for network, patterns in networks.items():
-            for pat in patterns:
-                for param_name, param in named_params:
-                    if param_name.startswith(network + '.') and pat in param_name:
-                        param.requires_grad=value
-
-    # Validate that all network names show up in model attributes.
-    for network in cfg.networks.keys():
-        if network not in model._modules:
-            raise ValueError(
-                f"cfg.networks key '{network}' is not a registered submodule of `model`."
-            )
-
-    named_params = list(model.named_parameters())
-
-    if cfg.mode == 'inclusion':
-        set_value(named_params, cfg.networks, cfg.requires_grad)
-    elif cfg.mode == 'exclusion':
-        for _, param in named_params:
-            param.requires_grad = cfg.requires_grad
-        set_value(named_params, cfg.networks, not(cfg.requires_grad))
-    else:
-        raise ValueError(
-            f"Got unrecognized value {cfg.mode} for `mode`. Must be 'inclusion' or 'exclusion'."
-        )
-    if cfg.verbose:
-        for param_name, param in named_params:
-            if param.requires_grad:
-                print(f"{param_name} is active.")
-            else:
-                print(f"{param_name} is frozen.")
+            
