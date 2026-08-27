@@ -2,6 +2,8 @@ from __future__ import annotations
 from dataclasses import dataclass, fields
 from typing import Protocol, TYPE_CHECKING
 
+from ..nested import shallow_asdict
+
 if TYPE_CHECKING:
     from .logging import Logger
     from .environment import BatchEnvironment
@@ -40,10 +42,7 @@ class LogBatch(CallbackBase):
         TODO: Will store directories and use path traversal to support dotted paths in items_to_log.
         """
         if self._should_run(batch_env.epoch_idx):
-            batch_log = {
-                f.name: getattr(batch_env, f.name) 
-                for f in fields(batch_env)
-            }
+            batch_log = shallow_asdict(batch_env)
             self.logger.log_batch(
                 epoch_idx=batch_env.epoch_idx,
                 batch_idx=batch_env.batch_idx,
@@ -90,20 +89,20 @@ class ReduceBatches(CallbackBase):
     
     def __call__(self, epoch_idx):
         if self._should_run(epoch_idx):
-            
-            # TODO: Use already written dotted path traversal function to support
-            # reducing more deeply nested items. This will be added to get_all_entries
-            # method.
-            batch_sizes = self.logger.get_all_entries(
-                dotted_path='batch_size', 
-                level='batch', 
-                epoch_idx=epoch_idx
+            # batch_sizes = self.logger.get_all_entries(
+            #     dotted_path='batch_size', 
+            #     level='batch', 
+            #     epoch_idx=epoch_idx
+            # )
+            # mean_values = {
+            #     dotted_path: self.logger.compute_weighted_sum(dotted_path=dotted_path, weights=batch_sizes)
+            #     for dotted_path in self.reduce_batches_for
+            # }
+            # self.logger.log_epoch(**mean_values)
+            self.logger.reduce_batches(
+                epoch_idx=epoch_idx, 
+                reduce_batches_for=self.reduce_batches_for
             )
-            mean_values = {
-                dotted_path: self.logger.compute_weighted_sum(dotted_path=dotted_path, weights=batch_sizes)
-                for dotted_path in self.reduce_batches_for
-            }
-            self.logger.log_epoch(**mean_values)
 
         return None
 
