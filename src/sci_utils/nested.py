@@ -1,6 +1,6 @@
 from dataclasses import fields, is_dataclass
 
-from sci_utils import validation as validation
+from . import validation
 
 
 def traverse_dotted_path(root, dotted_path: str):
