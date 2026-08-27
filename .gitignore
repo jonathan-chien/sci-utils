@@ -11,3 +11,7 @@ wheels/
 
 # Mac system files.
 .DS_Store
+
+# Directories.
+archive/
+notebooks/
