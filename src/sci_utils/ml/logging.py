@@ -4,19 +4,20 @@ from pathlib import Path
 import torch
 import warnings
 
-from .. import recursion as recursion
+from .. import recursion
+from .. import tensor as tensor_
+from ..nested import traverse_dotted_path
+
 
 class Logger:
     """ 
     Utility class for logging per batch/epoch results during training or 
     testing. Can log an arbitrary number of items per batch/epoch.
-
-    TODO: Add method to concatenate across epochs/batches, supporting dotted paths for nested dictionaries
     """
     def __init__(
             self, 
             log_name: str, 
-            log_dir: str | None = None, # Added default None sentinel 2026/07/15
+            log_dir: str | None = None,
             verbose_batch: bool = False,
             verbose_epoch: bool = True,
             print_flush_epoch: bool = False, 
@@ -35,16 +36,14 @@ class Logger:
         self.epoch_logs = {}
 
     def log_batch(self, *, epoch_idx: int, batch_idx: int, batch_size: int | None = None, suppress_print=False, **kwargs):
-        # 2025/08/16: Calling this method used to create new entry; changing
-        # this to create new entry if none exists and update existing one if
-        # one does. Also on 2025/08/16, changing to only detaching tensor input
-        # (no .item(), which assumes that input is scalar) and deferring cpu
-        # transfer to every n log inputs.
+        """ 
+        Add to existing batch entry or create new entry if none exists.
+        """
         entry = {
             key : val.detach() if isinstance(val, torch.Tensor) else val 
             for key, val in kwargs.items()
         }
-        # 2026/08/21 add batch_size as arg.
+        
         if batch_size is not None:
             entry.update({'batch_size': batch_size})
             
@@ -61,18 +60,12 @@ class Logger:
 
     def log_epoch(self, *, epoch_idx: int, suppress_print=False, **kwargs):
         """ 
-        TODO: Use recursive conversion to cpu/detach/item to support logging of nested dictionaries
-        x.cpu().item() if isinstance(x, torch.Tensor) and x.numel() == 1 else x
+        Add to existing epoch entry or create entry if none exists.
         """
-        # 2025/08/16: Calling this method used to create new entry; changing
-        # this to create new entry if none exists and update existing one if
-        # one does. Also on 2025/08/16, changing to only detaching tensor input
-        # (no item(), which assumes that input is scalar) and deferring cpu
-        # transfer to every n log inputs.
         entry = {
             key : val.detach() if isinstance(val, torch.Tensor) else val 
             for key, val in kwargs.items()
-        } # This was changed in the 2026 notebook version as well to not require tensor_utils
+        } 
         if epoch_idx in self.epoch_logs:
             self.epoch_logs[epoch_idx].update(entry)
         else:
@@ -85,8 +78,22 @@ class Logger:
                 )
 
     def to_cpu(self):
-        # Use recursion module to move all tensors in logger to cpu.
-        pass
+        """ 
+        All tensors should have been detached at the time they were logged.
+        Here, they can be periodically moved to the CPU.
+        """
+        recursion.recursive(
+            self,
+            branch_conditions=(
+                recursion.dataclass_branch,
+                recursion.dict_branch,
+                recursion.list_branch,
+                recursion.tuple_branch
+            ),
+            leaf_fns=(
+                tensor_.move_to_device('cpu')
+            )
+        )
 
     def get_entry(self, level: str, epoch_idx: int, batch_idx: int | None = None):
         """ 
@@ -114,9 +121,9 @@ class Logger:
                 f"Unrecognized value {level} for `level`. Must be in ['batch', 'epoch']."
             )
         
-    def get_all_entries(self, key: str, level: str, epoch_idx: int | None = None, return_tensor: bool = False):
+    def get_all_entries(self, dotted_path: str, level: str, epoch_idx: int | None = None, return_tensor: bool = False):
         """ 
-        On 2026/08/03, made conversion to tensor optional (default False).
+        Retrieve arbitrarily nested values in epoch or batch log.
         """
         if level not in ['batch', 'epoch']:
             raise ValueError(
@@ -135,46 +142,43 @@ class Logger:
             }
 
         try:
-            # TODO: Should probably add dotted path traversal here.
-            values = [entry[key] for entry in source.values()]
+            values = [traverse_dotted_path(entry, dotted_path) for entry in source.values()]
         except KeyError:
             raise KeyError(
-                f"The key '{key}' is missing from one or more {level} entries."
+                f"The key '{dotted_path}' is missing from one or more {level} entries."
             )
         
         return torch.tensor(values) if return_tensor else values
 
-    def compute_weighted_sum(self, key: str, level: str, weights: torch.Tensor, epoch_idx: int | None = None):
+    def compute_weighted_sum(self, dotted_path: str, level: str, weights: torch.Tensor, epoch_idx: int | None = None):
         """ 
         """
-        values = self.get_all_entries(key=key, level=level, epoch_idx=epoch_idx, return_tensor=True)
-        # tensor_utils.validate_tensor(weights, 1) # TODO: add this back when integrating this into standalone utils package
+        values = self.get_all_entries(dotted_path=dotted_path, level=level, epoch_idx=epoch_idx, return_tensor=True)
+        tensor_.validate_tensor(weights, 1)
         return torch.sum(values * weights)
 
     def reduce_batches(self, epoch_idx: int, reduce_batches_for: list[str]):
-        batch_sizes = self.get_all_entries(key='batch_size', level='batch', epoch_idx=epoch_idx, return_tensor=True)
+        batch_sizes = self.get_all_entries(dotted_path='batch_size', level='batch', epoch_idx=epoch_idx, return_tensor=True)
         total_num_obs = torch.sum(batch_sizes)
         weights = batch_sizes / total_num_obs
         mean_values = {
-            item_name: self.compute_weighted_sum(
-                key=item_name, 
+            dotted_path: self.compute_weighted_sum(
+                dotted_path=dotted_path, 
                 level='batch', 
                 weights=weights, 
                 epoch_idx=epoch_idx
             )
-            for item_name in reduce_batches_for
+            for dotted_path in reduce_batches_for
         }
-        # 2026/08/17: this assumes that calling this method when an entry already exists for that epoch will add to the existing entry rather than overwrite it.
         self.log_epoch(epoch_idx=epoch_idx, **mean_values)
 
-    
-    def save(self, log_dir: str | None = None): # Added log_dir arg here 2026/07/15
+    def save(self, log_dir: str | None = None):
         """ 
         """
         # TODO: User is currently responsible for calling serialization method
-        # before attempting to save. Could add try except block for more explicit exception handling.
+        # before attempting to save. Could add try except block for more
+        # explicit exception handling.
 
-        # Added 2026/07/15.
         if log_dir is not None:
             log_dir_to_use = log_dir
         elif self.log_dir is not None:

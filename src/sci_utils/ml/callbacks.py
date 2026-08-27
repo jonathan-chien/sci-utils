@@ -95,12 +95,12 @@ class ReduceBatches(CallbackBase):
             # reducing more deeply nested items. This will be added to get_all_entries
             # method.
             batch_sizes = self.logger.get_all_entries(
-                key='batch_size', 
+                dotted_path='batch_size', 
                 level='batch', 
                 epoch_idx=epoch_idx
             )
             mean_values = {
-                dotted_path: self.logger.compute_weighted_sum(key=dotted_path, weights=batch_sizes)
+                dotted_path: self.logger.compute_weighted_sum(dotted_path=dotted_path, weights=batch_sizes)
                 for dotted_path in self.reduce_batches_for
             }
             self.logger.log_epoch(**mean_values)
