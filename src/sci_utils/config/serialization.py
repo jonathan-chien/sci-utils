@@ -5,9 +5,10 @@ import types
 
 import torch
 
-from .. import fileio as fileio_utils
-from .. import recursion as recursion_utils
-from .. import validation as validation_utils
+from .. import fileio
+from .. import recursion
+from .. import validation as validation
+from ..nested import shallow_asdict
 
 
 # ------------------------------- General ------------------------------------ #
@@ -19,13 +20,6 @@ def get_constructor_params(x):
     """
     cls = x if isinstance(x, type) else x.__class__
     return list(inspect.signature(cls.__init__).parameters.keys())[1:] # First element is self
-
-def shallow_asdict(d): 
-    """ 
-    """
-    if not is_dataclass(d):
-        raise TypeError("`shallow_asdict` should be called on dataclass instances.")
-    return {f.name : getattr(d, f.name) for f in fields(d)}
 
 
 # --------------------------- Recursion branches ----------------------------- #
@@ -47,7 +41,7 @@ def handle_dict_with_transform_to_dataclass(d, recurse):
     # x = serialization_utils.tagged_dict_to_function(x)
     return x
 
-dict_branch_with_transform_to_dataclass = (validation_utils.is_dict, handle_dict_with_transform_to_dataclass)
+dict_branch_with_transform_to_dataclass = (validation.is_dict, handle_dict_with_transform_to_dataclass)
 
 # --------------------------------------------------
 def handle_dataclass_with_transform_to_dict(d, recurse):
@@ -109,7 +103,7 @@ def handle_dataclass_with_factory_config(d, recurse):
     from .types import FactoryConfig
 
     # Descend recursively into dataclass first.
-    d_transformed = recursion_utils.handle_dataclass(d, recurse)
+    d_transformed = recursion.handle_dataclass(d, recurse)
 
     # # Convert dtype strings to torch.dtypes.
     # updates = {}
@@ -172,13 +166,13 @@ def recursive_dataclass_to_tagged_dict(x):
     dicts.
     """
     # Convert for serialization. TODO: implement recursive check for dicts, return Boolean, could allow file deletion if dicts don't match
-    return recursion_utils.recursive(
+    return recursion.recursive(
         x,
         branch_conditionals=(
-            recursion_utils.tuple_branch, 
-            recursion_utils.list_branch, 
-            recursion_utils.dataframe_branch,
-            recursion_utils.dict_branch, 
+            recursion.tuple_branch, 
+            recursion.list_branch, 
+            recursion.dataframe_branch,
+            recursion.dict_branch, 
             dataclass_branch_with_transform_to_dict
         ),
         leaf_fns=(
@@ -206,7 +200,7 @@ def serialize(cfg, filepath):
     serializable = recursive_dataclass_to_tagged_dict(cfg)
 
     # Serialize/save.
-    fileio_utils.save_to_json(serializable, filepath, indent=2)
+    fileio.save_to_json(serializable, filepath, indent=2)
     return serializable
 
 
@@ -263,12 +257,12 @@ def tagged_dict_to_dataclass_instance(x):
         return x
     
 def recursive_tagged_dict_to_dataclass(x):
-    return recursion_utils.recursive(
+    return recursion.recursive(
         x,
         branch_conditionals=(
-            recursion_utils.tuple_branch, 
-            recursion_utils.list_branch, 
-            recursion_utils.dataframe_branch,
+            recursion.tuple_branch, 
+            recursion.list_branch, 
+            recursion.dataframe_branch,
             dict_branch_with_transform_to_dataclass,
         ),
         leaf_fns=(
@@ -280,7 +274,7 @@ def deserialize(filepath):
     """ 
     """
     # Deserialize and reconstruct.
-    serializable = fileio_utils.load_from_json(filepath)
+    serializable = fileio.load_from_json(filepath)
 
     # return recursion_utils.recursive(
     #     serializable,
@@ -300,13 +294,13 @@ def recursive_recover(x):
     Utility to recursively walk through nested object and replace any FactoryConfig
     objects with the result of calling the `recover` method on that object.
     """
-    return recursion_utils.recursive(
+    return recursion.recursive(
         x,
         branch_conditionals=(
-            recursion_utils.list_branch,
-            recursion_utils.tuple_branch,
-            recursion_utils.dataframe_branch,
-            recursion_utils.dict_branch,
+            recursion.list_branch,
+            recursion.tuple_branch,
+            recursion.dataframe_branch,
+            recursion.dict_branch,
             dataclass_branch_with_factory_config
         ),
         leaf_fns=(

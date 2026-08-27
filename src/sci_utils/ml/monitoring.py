@@ -4,7 +4,7 @@ import warnings
 
 import torch
 
-from .. import validation as validation_utils
+from .. import validation as validation
 
 
 class StopTraining(Exception):
@@ -21,8 +21,8 @@ class EarlyStopping(ABC):
         verbose: bool = True, 
         disabled: bool = False
     ):
-        validation_utils.validate_str(metric_name)
-        validation_utils.validate_nonneg_int(warmup)
+        validation.validate_str(metric_name)
+        validation.validate_nonneg_int(warmup)
         self.metric_name = metric_name
         self.warmup = warmup
         self.verbose = verbose
@@ -36,7 +36,7 @@ class EarlyStopping(ABC):
         Accepts new value and returns boolean indicating whether stopping 
         condition has been reached.
         """
-        validation_utils.validate_float(x)
+        validation.validate_float(x)
 
         # Always update, even if disabled, so any best value tracking
         # implemented by child classes can still be carried out.
@@ -99,8 +99,8 @@ class NoImprovementStopping(EarlyStopping):
     ):
         super().__init__(**kwargs)
 
-        validation_utils.validate_pos_int(patience)
-        validation_utils.validate_nonneg_float(tol)
+        validation.validate_pos_int(patience)
+        validation.validate_nonneg_float(tol)
         self.patience = patience
         self.mode = mode
         self.tol = tol

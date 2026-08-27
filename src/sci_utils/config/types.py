@@ -1,6 +1,8 @@
 from dataclasses import dataclass, fields, replace, asdict
 from typing import Any, Dict, List, Literal, Optional, Union, get_args, get_origin
 import warnings
+
+from ..nested import shallow_asdict
 warnings.simplefilter("always")
 
 import torch
@@ -17,7 +19,7 @@ class ArgsConfig:
     Attribute names should exactly match parameter names for function or method.
     """
     def shallow_asdict(self):
-        return serialization.shallow_asdict(self)
+        return shallow_asdict(self)
     
     def deep_asdict(self):
         return asdict(self)

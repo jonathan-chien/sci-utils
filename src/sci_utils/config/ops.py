@@ -1,98 +1,12 @@
 import argparse
 import ast
 import copy
-from dataclasses import is_dataclass, fields, replace
+from dataclasses import is_dataclass
 
-from .. import validation as validation_utils
+from .. import validation
+from sci_utils.nested import traverse_dotted_path
 
 
-def traverse_dotted_path(root, dotted_path: str):
-
-    validation_utils.validate_str(dotted_path)
-    if dotted_path == '':
-        return root
-    
-    dotted_path_parts = dotted_path.split('.')
-
-    branch = root 
-    for i_part, part in enumerate(dotted_path_parts):
-        # Validate during iteration so exact failure point can be output.
-        if part == '':
-            raise ValueError(
-                f"'' detected for {part} at position {i_part} in dotted path: "
-                f"'{dotted_path}'. Check for double dot typos, e.g. 'a..b.c'."
-            )
-        if part.strip() != part:
-            raise ValueError(
-                f"Empty space detected in for {part} at position {i_part} in " 
-                f"dotted_path: '{dotted_path}'."
-            )
-        if branch is None:
-            # Raise exception if None encountered on a non-leaf node.
-            raise ValueError(
-                "None value encountered for branch when attempting to access with " 
-                f"{part} at position {i_part} in dotted_path: '{dotted_path}'."
-            )
-
-        if is_dataclass(branch):
-            branch = getattr(branch, part)
-        elif isinstance(branch, dict):
-            branch = branch[part]
-        elif isinstance(branch, (list, tuple)):
-            # try:
-            #     idx = int(part)
-            #     validation_utils.validate_nonneg_int(idx)
-            # except ValueError:
-            #     raise ValueError(
-            #         "Expected a str representation of a non-negative integer at "
-            #         f"position {i_part} in dotted path: '{dotted_path}', but got {part}."
-            #     )
-            # branch = branch[part]
-            if part == '*':
-                # Wildcard, traverse for all items in iterable.
-                remainder = '.'.join(dotted_path_parts[i_part+1:])
-                if remainder == '':
-                    # If no more parts, return the whole iterable.
-                    return list(branch) if isinstance(branch, tuple) else branch
-                else:
-                    # Otherwise, recursively traverse the rest of the path.
-                    return [traverse_dotted_path(item, remainder) for item in branch]
-            else:
-                # If part is not wildcard, assume it is an index.
-                try:
-                    idx = int(part)
-                except ValueError:
-                    raise ValueError(
-                        "Expected a str representation of an int at position "
-                        f"{i_part} in dotted path: '{dotted_path}', but got {part}."
-                    )
-                try:
-                    branch = branch[idx]
-                except IndexError:
-                    raise IndexError(
-                        f"Index {idx} out of bounds for branch at position {i_part} in "
-                        f"dotted path: '{dotted_path}'. Branch has length {len(branch)}."
-                    )
-                # try:
-                #     part = ast.literal_eval(part)
-                # except (ValueError, SyntaxError):
-                #     raise ValueError(
-                #         f"Expected a str representation of a list of non-negative integers at "
-                #         f"position {i_part} in dotted path: '{dotted_path}', but got {part}."   
-                #     )
-                # branch = [traverse_dotted_path(item, '.'.join(dotted_path_parts[i_part+1:])) for item in branch[part]]
-        else:
-            incorrect = 'root' if i_part == 0 else f'branch {i_part-1}'
-            raise RuntimeError(
-                "Unexpected condition reached during attempted traversal of " 
-                f"root object according to dotted path: '{dotted_path}'. " 
-                "Expected a dataclass, dict, or iterable for root and all branches "
-                f"but got type {type(branch)} for {incorrect}. This resulted in "
-                f"this exception being raised at position {i_part} in the dotted path."
-            )
-        
-    return branch
-        
 # Could refactor this (and parse_override_kv_pairs) out into a separate cli.py
 # module in the general_utils package, though their current uses are related to 
 # construction of configs, even if they don't operate on configs directly.
@@ -220,7 +134,7 @@ def apply_cli_override(cfg, override_kv_pair_list, raise_if_not_exist=True):
         data_cfg. For clearer error messages, the name '<root>' will be returned
         instead of the empty string.
         """
-        validation_utils.validate_str(path_string)
+        validation.validate_str(path_string)
         return '<root>' if path_string == '' else path_string
 
     cfg_copy = copy.deepcopy(cfg)
@@ -228,7 +142,7 @@ def apply_cli_override(cfg, override_kv_pair_list, raise_if_not_exist=True):
     kv_dict = parse_override_kv_pairs(override_kv_pair_list)
     for key, value in kv_dict.items():
         # Get dotted path to final branch and leaf name. 
-        validation_utils.validate_str(key)
+        validation.validate_str(key)
         dotted_path_to_leaf, leaf_value = key, value
         dotted_path_to_leaf_parts = dotted_path_to_leaf.split('.') 
         dotted_path_to_final_branch = '.'.join(dotted_path_to_leaf_parts[:-1]) 

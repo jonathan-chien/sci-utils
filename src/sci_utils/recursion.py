@@ -2,7 +2,7 @@ from dataclasses import is_dataclass, fields
 import pandas as pd
 
 # from . import serialization as serialization_utils
-from . import validation as validation_utils
+from . import validation
 
 
 def recursive(x, branch_conditionals, leaf_fns, depth=None, max_depth=100):
@@ -34,7 +34,7 @@ def recursive(x, branch_conditionals, leaf_fns, depth=None, max_depth=100):
 def handle_dict(d, recurse):
     return {k : recurse(v) for k, v in d.items()}
 
-dict_branch = (validation_utils.is_dict, handle_dict)
+dict_branch = (validation.is_dict, handle_dict)
 
 # def handle_dict_with_transform_to_dataclass(d, recurse):
 #     """ 
@@ -59,7 +59,7 @@ dict_branch = (validation_utils.is_dict, handle_dict)
 def handle_list(l, recurse):
     return [recurse(v) for v in l]
 
-list_branch = (validation_utils.is_list, handle_list)
+list_branch = (validation.is_list, handle_list)
 
 # def is_tuple(x):
 #     return isinstance(x, tuple)
@@ -67,7 +67,7 @@ list_branch = (validation_utils.is_list, handle_list)
 def handle_tuple(t, recurse):
     return tuple(recurse(v) for v in t)
 
-tuple_branch = (validation_utils.is_tuple, handle_tuple)
+tuple_branch = (validation.is_tuple, handle_tuple)
 
 def handle_dataclass(d, recurse):
     """ 
@@ -128,4 +128,4 @@ def handle_dataframe(df, recurse):
     """
     return df.map(recurse)
 
-dataframe_branch = (validation_utils.is_dataframe, handle_dataframe)
+dataframe_branch = (validation.is_dataframe, handle_dataframe)

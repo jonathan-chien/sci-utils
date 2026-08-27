@@ -8,7 +8,7 @@ import textwrap
 from typing import Union
 import warnings
 
-from . import fileio as fileio_utils
+from . import fileio
 
 
 def collect_metadata(additional_info: dict, short=False, enforce_clean_git_tree=True):
@@ -49,7 +49,7 @@ def collect_and_save_metadata(
             f"{filepath} already exists (`overwrite`=False)!"
         )
     
-    fileio_utils.save_to_json(metadata, filepath)
+    fileio.save_to_json(metadata, filepath)
 
     return metadata
 

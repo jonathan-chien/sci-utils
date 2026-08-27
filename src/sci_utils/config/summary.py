@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, Union
 import pandas as pd
 
 from . import serialization
-from . import ops 
+from .. import nested 
 
 
 @dataclass(slots=True)
@@ -23,7 +23,7 @@ def summarize_cfg(cfg, dotted_path_registry: Dict[str, Union[str, Callable]]) ->
     summary = {}
     for key, val in dotted_path_registry.items():
         if isinstance(val, str):
-            summary[key] = ops.traverse_dotted_path(cfg, val)
+            summary[key] = nested.traverse_dotted_path(cfg, val)
         elif callable(val):
             summary[key] = val(cfg)
         else:

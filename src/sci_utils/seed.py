@@ -1,6 +1,6 @@
 import numpy as np
 
-from . import validation as validation_utils
+from . import validation
 
 
 def recursive_seed_sequence_spawn(
@@ -16,12 +16,12 @@ def recursive_seed_sequence_spawn(
     SeedSequence class. Base case results in a seed returned (either as int or 
     numpy array), whereas all other calls return lists.
     """
-    validation_utils.validate_iterable_contents(
+    validation.validate_iterable_contents(
         num_children_per_level,
-        predicate=validation_utils.is_pos_int,
+        predicate=validation.is_pos_int,
         expected_description="a positive int"
     )
-    validation_utils.validate_nonneg_int(depth)
+    validation.validate_nonneg_int(depth)
     
     if depth == len(num_children_per_level):
         # Base case.
