@@ -32,4 +32,8 @@ class LinearCombinationLoss:
 
 
 def mse_loss(batch_env: BatchEnvironment, params: dict[str, torch.nn.Parameter] | None = None):
-    return torch.mean((batch_env.y_hat - batch_env.y)**2)
+    # XXX: Forgetting to reshape tensors to match is a dangerous failure mode
+    # because it's silent, causing no excpetions to be raised but preventing
+    # learning from happening. Could deal with this by creating a base LossFn
+    # class instead of a Protocol or by reshaping in evaluate.
+    return torch.mean((batch_env.y_hat.reshape_as(batch_env.y) - batch_env.y)**2)
