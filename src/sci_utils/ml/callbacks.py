@@ -133,6 +133,27 @@ class MoveToCPU(CallbackBase):
 
 
 @dataclass
+class PrintFromLogger(CallbackBase):
+    """ 
+    Epoch callback.
+    """
+    logger: Logger
+    items_to_print: list[str]
+
+    def __call__(self, epoch_idx):
+        if self._should_run(epoch_idx):
+            for dotted_path in self.items_to_print:
+                item = self.logger.get_entry(
+                    dotted_path=dotted_path, 
+                    level='epoch', 
+                    epoch_idx=epoch_idx
+                )
+                print(
+                    f"{dotted_path} for epoch {epoch_idx}: {item}"
+                )
+
+
+@dataclass
 class EarlyStoppingCallback(CallbackBase):
     """ 
     Should match EpochCallback Protocol.
